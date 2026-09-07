@@ -1,27 +1,13 @@
-/// Représente une cryptomonnaie et ses données de marché.
-///
-/// Cet objet est immuable : toute mise à jour (prix, volume...) passe par
-/// [copyWith] ou [updateFromBinanceTicker], qui retournent une nouvelle
-/// instance plutôt que de modifier l'existante.
-///
-/// Deux sources de données alimentent ce modèle :
-/// - CoinGecko (REST) fournit les données complètes via [fromCoinGeckoJson]
-/// - Binance (WebSocket) fournit uniquement les mises à jour de prix en
-///   temps réel via [updateFromBinanceTicker] — voir cette méthode pour
-///   savoir pourquoi elle ne peut pas créer un [Crypto] seule.
+/// Immuable : les mises à jour passent par [copyWith] ou
+/// [updateFromBinanceTicker], jamais de modification directe.
 class Crypto {
- /// Identifiant CoinGecko (ex: "bitcoin"). Absent côté Binance.
   final String id;
-
   final String name;
-
-  /// Toujours normalisé en minuscules pour rester cohérent entre
-  /// CoinGecko ("btc") et Binance ("BTC").
   final String symbol;
 
   final double currentPrice;
 
-  /// Absent des tickers Binance — nullable pour cette raison.
+  /// Absent des tickers Binance c'est pour cette raison qu'il est nullable.
   final String? imageUrl;
 
   final double? priceChangePercentage24h;
@@ -53,9 +39,7 @@ class Crypto {
     this.volume24h,
   });
 
-
-
-   Crypto copyWith({
+  Crypto copyWith({
     String? id,
     String? name,
     String? symbol,
@@ -85,68 +69,67 @@ class Crypto {
       volume24h: volume24h ?? this.volume24h,
     );
   }
+  
+  /// ces methodes sont utilisées pour parser les données de l'API CoinGecko, 
+  /// qui peut renvoyer des nombres sous forme de String ou de num.
+  static double? _parseDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value); // sécurité si l'API change
+    return null;
+  }
+
+  static int? _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return null;
+  }
 
   /// Construit un [Crypto] à partir d'une entrée de la réponse
   /// `/coins/markets` de CoinGecko.
-  ///
-  /// Lève une [FormatException] si un champ requis (id, name, symbol,
-  /// current_price) est manquant. Si `last_updated` est absent ou mal
-  /// formaté, la date courante est utilisée en fallback.
-
-
-  factory Crypto.fromCoinGeckoJson(Map<String, dynamic> json) { 
-    if (json['id'] == null || json['name'] == null || 
-      json['symbol'] == null || json['current_price'] == null) {
-      throw FormatException('Champ requis manquant dans le JSON CoinGecko: ${json['id'] ?? 'id inconnu'}');
+  factory Crypto.fromCoinGeckoJson(Map<String, dynamic> json) {
+    if (json['id'] is! String || json['name'] is! String ||
+        json['symbol'] is! String || json['current_price'] is! num) {
+      throw FormatException('Champ requis manquant ou de type invalide dans le JSON CoinGecko');
     }
     return Crypto(
       id: json['id'],
       name: json['name'],
-      symbol: json['symbol'].toLowerCase(),
+      symbol: (json['symbol'] as String).toLowerCase(),
       currentPrice: (json['current_price'] as num).toDouble(),
-      imageUrl: json['image'],
-      priceChangePercentage24h:
-          (json['price_change_percentage_24h'] as num?)?.toDouble(),
-      high24h: (json['high_24h'] as num?)?.toDouble(),
-      low24h: (json['low_24h'] as num?)?.toDouble(),
-      marketCap: (json['market_cap'] as num?)?.toDouble(),
-      marketCapRank: (json['market_cap_rank'] as num?)?.toInt(),
-      lastUpdated: json['last_updated'] != null
-    ? DateTime.tryParse(json['last_updated']) ?? DateTime.now()
-    : DateTime.now(),
-      volume24h: (json['total_volume'] as num?)?.toDouble(),
+      imageUrl: json['image'] is String ? json['image'] : null,
+      priceChangePercentage24h: _parseDouble(json['price_change_percentage_24h']),
+      high24h: _parseDouble(json['high_24h']),
+      low24h: _parseDouble(json['low_24h']),
+      marketCap: _parseDouble(json['market_cap']),
+      marketCapRank: _parseInt(json['market_cap_rank']),
+      lastUpdated: json['last_updated'] is String
+          ? DateTime.tryParse(json['last_updated']) ?? DateTime.now()
+          : DateTime.now(),
+      volume24h: _parseDouble(json['total_volume']),
     );
   }
 
-  /// Met à jour ce [Crypto] à partir d'un message du flux WebSocket
-  /// Binance `<symbol>@ticker`.
-  ///
-  /// Ne crée jamais un nouvel objet depuis zéro : Binance ne fournit ni
-  /// id, ni name, ni image, ni market cap. Un champ manquant ou corrompu
-  /// dans le ticker conserve simplement l'ancienne valeur plutôt que de
-  /// faire échouer la mise à jour.
+  /// Cette methode est utilisée pour parser les données de l'API Binance, 
+  /// qui renvoie des nombres sous forme de String ou de num.
+  static double? _parseBinanceDouble(dynamic value) {
+    if (value is String) return double.tryParse(value);
+    if (value is num) return value.toDouble();
+    return null;
+  }
+
+  /// Binance ne fournit ni id, ni name, ni image : cette méthode met à
+  /// jour une instance existante plutôt que d'en créer une nouvelle.
 
   Crypto updateFromBinanceTicker(Map<String, dynamic> json) {
-  return copyWith(
-    currentPrice: json['c'] != null 
-        ? double.tryParse(json['c']) 
-        : null,
-    priceChangePercentage24h: json['P'] != null 
-        ? double.tryParse(json['P']) 
-        : null,
-    high24h: json['h'] != null 
-        ? double.tryParse(json['h']) 
-        : null,
-    low24h: json['l'] != null 
-        ? double.tryParse(json['l']) 
-        : null,
-    volume24h: json['q'] != null 
-        ? double.tryParse(json['q']) 
-        : null,
-    lastUpdated: json['E'] != null 
-        ? DateTime.fromMillisecondsSinceEpoch(json['E']) 
-        : null,
-  );
-}
-    
+    return copyWith(
+      currentPrice: _parseBinanceDouble(json['c']),
+      priceChangePercentage24h: _parseBinanceDouble(json['P']),
+      high24h: _parseBinanceDouble(json['h']),
+      low24h: _parseBinanceDouble(json['l']),
+      volume24h: _parseBinanceDouble(json['q']),
+      lastUpdated: json['E'] is int
+          ? DateTime.fromMillisecondsSinceEpoch(json['E'])
+          : null,
+    );
+  }
 }
