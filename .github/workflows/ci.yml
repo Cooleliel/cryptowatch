@@ -28,6 +28,7 @@ jobs:
       - name: Installation des dépendances
         run: flutter pub get
 
+        
       - name: Analyse statique
         run: flutter analyze
 
