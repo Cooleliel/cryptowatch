@@ -1,31 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cryptowatch/app/theme/app_colors.dart';
+import 'package:cryptowatch/features/crypto_detail/presentation/providers/price_history_provider.dart';
+import 'package:cryptowatch/features/crypto_detail/presentation/providers/price_history_state.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/widgets/week_line_chart.dart';
 
-/// Fiche Bitcoin du mockup. Valeurs figées pour coller à l'image.
-class CryptoDetailScreen extends StatelessWidget {
-  const CryptoDetailScreen({super.key});
+/// Fiche crypto. La courbe 7 jours vient de T-10a (plus de points fictifs).
+class CryptoDetailScreen extends ConsumerWidget {
+  const CryptoDetailScreen({super.key, this.coinId = 'bitcoin'});
 
-  static const _weekValues = [
-    0.22,
-    0.40,
-    0.30,
-    0.52,
-    0.34,
-    0.68,
-    0.42,
-    0.78,
-    0.58,
-    0.50,
-    0.74,
-    0.62,
-    0.92,
-  ];
+  final String coinId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final chartState = ref.watch(priceHistoryProvider(coinId));
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Scaffold(
@@ -51,7 +42,11 @@ class CryptoDetailScreen extends StatelessWidget {
                 const SizedBox(height: 12),
                 const _ChangePill(),
                 const SizedBox(height: 28),
-                const WeekLineChart(values: _weekValues),
+                _ChartSection(
+                  state: chartState,
+                  onRetry: () =>
+                      ref.read(priceHistoryProvider(coinId).notifier).retry(),
+                ),
                 const SizedBox(height: 28),
                 const _StatsGrid(),
               ],
@@ -60,6 +55,44 @@ class CryptoDetailScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _ChartSection extends StatelessWidget {
+  const _ChartSection({required this.state, required this.onRetry});
+
+  final PriceHistoryState state;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (state) {
+      PriceHistoryLoading() => const SizedBox(
+          height: 196,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      PriceHistoryError(:final message) => SizedBox(
+          height: 196,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  onPressed: onRetry,
+                  child: const Text('Réessayer'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      PriceHistoryLoaded(:final prices) => WeekLineChart(values: prices),
+    };
   }
 }
 
