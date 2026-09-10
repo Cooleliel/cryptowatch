@@ -34,4 +34,12 @@ class MarketNotifier extends StateNotifier<MarketState> {
   }
 
   Future<void> retry() => _loadCryptos();
+
+  /// Filtre la liste déjà chargée. Sans effet hors de [MarketLoaded].
+  void setQuery(String query) {
+    final current = state;
+    if (current is! MarketLoaded) return;
+    if (current.query == query) return;
+    state = current.copyWith(query: query);
+  }
 }

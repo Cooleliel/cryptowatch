@@ -21,12 +21,47 @@ class MarketScreen extends ConsumerWidget {
           ),
         MarketLoaded(:final cryptos) => cryptos.isEmpty
             ? const Center(child: Text('Aucune crypto trouvée'))
-            : ListView.builder(
-                itemCount: cryptos.length,
-                itemBuilder: (context, index) =>
-                    CryptoCard(crypto: cryptos[index]),
-              ),
+            : const _LoadedMarketView(),
       },
+    );
+  }
+}
+
+class _LoadedMarketView extends ConsumerWidget {
+  const _LoadedMarketView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(marketProvider);
+    if (state is! MarketLoaded) return const SizedBox.shrink();
+
+    final visible = state.visibleCryptos;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: TextField(
+            key: const Key('market-search-field'),
+            textInputAction: TextInputAction.search,
+            onChanged: ref.read(marketProvider.notifier).setQuery,
+            decoration: const InputDecoration(
+              hintText: 'Rechercher un nom ou un symbole',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ),
+        Expanded(
+          child: visible.isEmpty
+              ? const Center(child: Text('Aucune crypto trouvée'))
+              : ListView.builder(
+                  itemCount: visible.length,
+                  itemBuilder: (context, index) =>
+                      CryptoCard(crypto: visible[index]),
+                ),
+        ),
+      ],
     );
   }
 }
