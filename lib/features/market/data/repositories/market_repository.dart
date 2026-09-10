@@ -21,11 +21,12 @@ class MarketRepository {
   /// Injectable pour que les tests n'aient pas a patienter dix secondes.
   static const Duration _defaultTimeout = Duration(seconds: 10);
 
-  MarketRepository(this._client, {Duration timeout = _defaultTimeout})
-    : _timeout = timeout;
+  MarketRepository(this._client, {this.timeout = _defaultTimeout});
 
   final http.Client _client;
-  final Duration _timeout;
+
+  /// Delai effectivement applique aux requetes de ce repository.
+  final Duration timeout;
 
   Future<List<Crypto>> fetchTopCryptos() async {
     final http.Response response = await _get(Uri.parse(_topCryptosUrl));
@@ -51,9 +52,9 @@ class MarketRepository {
   /// depassements de delai en [MarketException].
   Future<http.Response> _get(Uri uri) async {
     try {
-      return await _client.get(uri).timeout(_timeout);
+      return await _client.get(uri).timeout(timeout);
     } on TimeoutException {
-      throw RequestTimeoutException(_timeout);
+      throw RequestTimeoutException(timeout);
     } on http.ClientException catch (error) {
       // IOClient enveloppe SocketException dans ClientException : attraper
       // ClientException suffit, et evite d'importer dart:io - qui casserait
