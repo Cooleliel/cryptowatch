@@ -10,8 +10,8 @@ final priceHistoryRepositoryProvider = Provider<PriceHistoryRepository>((ref) {
   return PriceHistoryRepository(http.Client());
 });
 
-final priceHistoryProvider = StateNotifierProvider.family<
-    PriceHistoryNotifier, PriceHistoryState, String>((ref, coinId) {
+final priceHistoryProvider = StateNotifierProvider.autoDispose
+    .family<PriceHistoryNotifier, PriceHistoryState, String>((ref, coinId) {
   return PriceHistoryNotifier(
     ref.read(priceHistoryRepositoryProvider),
     coinId,

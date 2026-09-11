@@ -31,9 +31,14 @@ void main() {
 
   tearDown(() => container.dispose());
 
+  void keepAlive() {
+    container.listen(priceHistoryProvider('bitcoin'), (_, __) {});
+  }
+
   test('passe à PriceHistoryLoaded avec les points en cas de succès', () async {
     when(() => mockRepository.fetchLast7Days('bitcoin'))
         .thenAnswer((_) async => samplePoints);
+    keepAlive();
 
     await container.read(priceHistoryProvider('bitcoin').notifier).retry();
 
@@ -46,6 +51,7 @@ void main() {
   test('passe à PriceHistoryError si le repository lève', () async {
     when(() => mockRepository.fetchLast7Days('bitcoin'))
         .thenThrow(const NetworkException('offline'));
+    keepAlive();
 
     await container.read(priceHistoryProvider('bitcoin').notifier).retry();
 
@@ -60,6 +66,7 @@ void main() {
   test('distingue un 429 d\'une panne réseau', () async {
     when(() => mockRepository.fetchLast7Days('bitcoin'))
         .thenThrow(const RateLimitException());
+    keepAlive();
 
     await container.read(priceHistoryProvider('bitcoin').notifier).retry();
 
@@ -75,6 +82,7 @@ void main() {
     when(() => mockRepository.fetchLast7Days('bitcoin')).thenAnswer(
       (_) async => [PricePoint(time: DateTime(2026, 9, 4), price: 64000)],
     );
+    keepAlive();
 
     await container.read(priceHistoryProvider('bitcoin').notifier).retry();
 
