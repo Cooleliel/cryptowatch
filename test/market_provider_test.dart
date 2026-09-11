@@ -166,4 +166,152 @@ void main() {
     final loaded = MarketLoaded(sampleCryptos, query: '  ETH  ');
     expect(loaded.visibleCryptos.single.name, 'Ethereum');
   });
+
+  test('trie par prix décroissant sans modifier la liste brute', () async {
+    when(() => mockRepository.fetchTopCryptos())
+        .thenAnswer((_) async => sampleCryptos);
+
+    await container.read(marketProvider.notifier).retry();
+    container.read(marketProvider.notifier).setSortField(MarketSortField.price);
+
+    final state = container.read(marketProvider) as MarketLoaded;
+    expect(state.cryptos, sampleCryptos);
+    expect(state.visibleCryptos.map((c) => c.id), ['bitcoin', 'ethereum']);
+  });
+
+  test('un second tap inverse l\'ordre du même critère', () async {
+    when(() => mockRepository.fetchTopCryptos())
+        .thenAnswer((_) async => sampleCryptos);
+
+    await container.read(marketProvider.notifier).retry();
+    container.read(marketProvider.notifier).setSortField(MarketSortField.price);
+    container.read(marketProvider.notifier).setSortField(MarketSortField.price);
+
+    final state = container.read(marketProvider) as MarketLoaded;
+    expect(state.sortDescending, isFalse);
+    expect(state.visibleCryptos.map((c) => c.id), ['ethereum', 'bitcoin']);
+  });
+
+  test('trie par variation et place les valeurs nulles à la fin', () {
+    final cryptos = [
+      Crypto(
+        id: 'bitcoin',
+        name: 'Bitcoin',
+        symbol: 'btc',
+        currentPrice: 1,
+        priceChangePercentage24h: 2.0,
+        lastUpdated: DateTime(2026, 1, 1),
+      ),
+      Crypto(
+        id: 'tether',
+        name: 'Tether',
+        symbol: 'usdt',
+        currentPrice: 1,
+        lastUpdated: DateTime(2026, 1, 1),
+      ),
+      Crypto(
+        id: 'solana',
+        name: 'Solana',
+        symbol: 'sol',
+        currentPrice: 1,
+        priceChangePercentage24h: 8.0,
+        lastUpdated: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    final loaded = MarketLoaded(
+      cryptos,
+      sortField: MarketSortField.variation,
+    );
+
+    expect(loaded.visibleCryptos.map((c) => c.id), [
+      'solana',
+      'bitcoin',
+      'tether',
+    ]);
+  });
+
+  test('trie par capitalisation décroissante', () {
+    final cryptos = [
+      Crypto(
+        id: 'ethereum',
+        name: 'Ethereum',
+        symbol: 'eth',
+        currentPrice: 1,
+        marketCap: 400,
+        lastUpdated: DateTime(2026, 1, 1),
+      ),
+      Crypto(
+        id: 'bitcoin',
+        name: 'Bitcoin',
+        symbol: 'btc',
+        currentPrice: 1,
+        marketCap: 900,
+        lastUpdated: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    final loaded = MarketLoaded(
+      cryptos,
+      sortField: MarketSortField.marketCap,
+    );
+
+    expect(loaded.visibleCryptos.map((c) => c.id), ['bitcoin', 'ethereum']);
+  });
+
+  test('le tri s\'applique après le filtre', () {
+    final cryptos = [
+      Crypto(
+        id: 'bitcoin',
+        name: 'Bitcoin',
+        symbol: 'btc',
+        currentPrice: 45000,
+        lastUpdated: DateTime(2026, 1, 1),
+      ),
+      Crypto(
+        id: 'binancecoin',
+        name: 'BNB',
+        symbol: 'bnb',
+        currentPrice: 600,
+        lastUpdated: DateTime(2026, 1, 1),
+      ),
+      Crypto(
+        id: 'ethereum',
+        name: 'Ethereum',
+        symbol: 'eth',
+        currentPrice: 3000,
+        lastUpdated: DateTime(2026, 1, 1),
+      ),
+    ];
+
+    final loaded = MarketLoaded(
+      cryptos,
+      query: 'b',
+      sortField: MarketSortField.price,
+    );
+
+    expect(loaded.visibleCryptos.map((c) => c.id), ['bitcoin', 'binancecoin']);
+  });
+
+  test('retry réinitialise le tri', () async {
+    when(() => mockRepository.fetchTopCryptos())
+        .thenAnswer((_) async => sampleCryptos);
+
+    await container.read(marketProvider.notifier).retry();
+    container.read(marketProvider.notifier).setSortField(MarketSortField.price);
+    await container.read(marketProvider.notifier).retry();
+
+    final state = container.read(marketProvider) as MarketLoaded;
+    expect(state.sortField, isNull);
+    expect(state.visibleCryptos, sampleCryptos);
+  });
+
+  test('setSortField est ignoré en MarketError', () async {
+    when(() => mockRepository.fetchTopCryptos())
+        .thenThrow(Exception('Network error'));
+
+    await container.read(marketProvider.notifier).retry();
+    container.read(marketProvider.notifier).setSortField(MarketSortField.price);
+    expect(container.read(marketProvider), isA<MarketError>());
+  });
 }

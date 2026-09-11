@@ -52,6 +52,7 @@ class _LoadedMarketView extends ConsumerWidget {
             ),
           ),
         ),
+        const _SortBar(),
         Expanded(
           child: visible.isEmpty
               ? const Center(child: Text('Aucune crypto trouvée'))
@@ -62,6 +63,79 @@ class _LoadedMarketView extends ConsumerWidget {
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _SortBar extends ConsumerWidget {
+  const _SortBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(marketProvider);
+    if (state is! MarketLoaded) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          _SortChip(
+            key: const Key('market-sort-price'),
+            label: 'Prix',
+            field: MarketSortField.price,
+            state: state,
+          ),
+          _SortChip(
+            key: const Key('market-sort-variation'),
+            label: 'Variation',
+            field: MarketSortField.variation,
+            state: state,
+          ),
+          _SortChip(
+            key: const Key('market-sort-market-cap'),
+            label: 'Cap',
+            field: MarketSortField.marketCap,
+            state: state,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SortChip extends ConsumerWidget {
+  const _SortChip({
+    super.key,
+    required this.label,
+    required this.field,
+    required this.state,
+  });
+
+  final String label;
+  final MarketSortField field;
+  final MarketLoaded state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = state.sortField == field;
+    return FilterChip(
+      label: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          if (selected) ...[
+            const SizedBox(width: 4),
+            Icon(
+              state.sortDescending ? Icons.arrow_downward : Icons.arrow_upward,
+              size: 16,
+            ),
+          ],
+        ],
+      ),
+      selected: selected,
+      onSelected: (_) => ref.read(marketProvider.notifier).setSortField(field),
     );
   }
 }
