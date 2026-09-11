@@ -32,7 +32,7 @@ void main() {
   tearDown(() => container.dispose());
 
   void keepAlive() {
-    container.listen(priceHistoryProvider('bitcoin'), (_, __) {});
+    container.listen(priceHistoryProvider('bitcoin'), (_, _) {});
   }
 
   test('passe à PriceHistoryLoaded avec les points en cas de succès', () async {
