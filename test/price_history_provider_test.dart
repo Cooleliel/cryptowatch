@@ -6,6 +6,7 @@ import 'package:cryptowatch/features/crypto_detail/data/repositories/price_histo
 import 'package:cryptowatch/features/crypto_detail/domain/price_point.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/providers/price_history_provider.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/providers/price_history_state.dart';
+import 'package:cryptowatch/features/market/data/market_exception.dart';
 
 class MockPriceHistoryRepository extends Mock
     implements PriceHistoryRepository {}
@@ -44,13 +45,29 @@ void main() {
 
   test('passe à PriceHistoryError si le repository lève', () async {
     when(() => mockRepository.fetchLast7Days('bitcoin'))
-        .thenThrow(Exception('Network error'));
+        .thenThrow(const NetworkException('offline'));
 
     await container.read(priceHistoryProvider('bitcoin').notifier).retry();
 
+    final state = container.read(priceHistoryProvider('bitcoin'));
+    expect(state, isA<PriceHistoryError>());
     expect(
-      container.read(priceHistoryProvider('bitcoin')),
-      isA<PriceHistoryError>(),
+      (state as PriceHistoryError).message,
+      contains('connexion'),
+    );
+  });
+
+  test('distingue un 429 d\'une panne réseau', () async {
+    when(() => mockRepository.fetchLast7Days('bitcoin'))
+        .thenThrow(const RateLimitException());
+
+    await container.read(priceHistoryProvider('bitcoin').notifier).retry();
+
+    final state = container.read(priceHistoryProvider('bitcoin'));
+    expect(state, isA<PriceHistoryError>());
+    expect(
+      (state as PriceHistoryError).message,
+      contains('Trop de requêtes'),
     );
   });
 
