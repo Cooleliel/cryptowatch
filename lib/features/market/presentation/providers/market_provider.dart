@@ -42,4 +42,15 @@ class MarketNotifier extends StateNotifier<MarketState> {
     if (current.query == query) return;
     state = current.copyWith(query: query);
   }
+
+  /// Active un critère de tri. Un second tap sur le même critère inverse l'ordre.
+  void setSortField(MarketSortField field) {
+    final current = state;
+    if (current is! MarketLoaded) return;
+    if (current.sortField == field) {
+      state = current.copyWith(sortDescending: !current.sortDescending);
+      return;
+    }
+    state = current.copyWith(sortField: field, sortDescending: true);
+  }
 }
