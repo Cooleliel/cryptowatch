@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 
 import 'package:cryptowatch/features/crypto_detail/data/repositories/price_history_repository.dart';
-import 'package:cryptowatch/features/market/data/market_exception.dart';
+import 'package:cryptowatch/shared/errors/app_exception.dart';
 
 class _FakeHttpClient extends http.BaseClient {
   _FakeHttpClient({
@@ -34,6 +34,23 @@ class _FakeHttpClient extends http.BaseClient {
       statusCode,
     );
   }
+}
+
+/// Capture les traces pour prouver qu'aucun rejet n'est silencieux.
+class _TraceRecorder {
+  final List<String> messages = <String>[];
+  final List<Object?> errors = <Object?>[];
+
+  void call(String message, {Object? error, StackTrace? stackTrace}) {
+    messages.add(message);
+    errors.add(error);
+  }
+
+  String get joined => messages.join(' | ');
+}
+
+String _bodyWithPrices(List<Object?> prices) {
+  return jsonEncode(<String, Object?>{'prices': prices});
 }
 
 void main() {
@@ -164,5 +181,119 @@ void main() {
     expect(points, hasLength(2));
     expect(points.first.price, 64000.12);
     expect(points.last.price, 65100.0);
+  });
+
+  group('aucune erreur silencieuse', () {
+    test('un point rejete laisse une trace portant la cause', () async {
+      final trace = _TraceRecorder();
+      final client = _FakeHttpClient(
+        statusCode: 200,
+        body: _bodyWithPrices(<Object?>[
+          <Object?>[1725600000000, 64000.12],
+          <Object?>['casse', 'casse'],
+        ]),
+      );
+
+      final points = await PriceHistoryRepository(
+        client,
+        log: trace.call,
+      ).fetchLast7Days('bitcoin');
+
+      expect(points, hasLength(1));
+      expect(trace.messages, isNotEmpty, reason: 'le rejet doit etre trace');
+      expect(trace.errors.whereType<FormatException>(), isNotEmpty);
+    });
+
+    test('un rejet partiel laisse un resume chiffre', () async {
+      final trace = _TraceRecorder();
+      final client = _FakeHttpClient(
+        statusCode: 200,
+        body: _bodyWithPrices(<Object?>[
+          <Object?>[1725600000000, 64000.12],
+          <Object?>['casse', 'casse'],
+          'pas-une-paire',
+        ]),
+      );
+
+      await PriceHistoryRepository(
+        client,
+        log: trace.call,
+      ).fetchLast7Days('bitcoin');
+
+      expect(trace.joined, contains('2'));
+      expect(trace.joined, contains('3'));
+    });
+
+    test('ne trace rien quand tous les points sont valides', () async {
+      final trace = _TraceRecorder();
+      final client = _FakeHttpClient(
+        statusCode: 200,
+        body: _bodyWithPrices(<Object?>[
+          <Object?>[1725600000000, 64000.12],
+        ]),
+      );
+
+      await PriceHistoryRepository(
+        client,
+        log: trace.call,
+      ).fetchLast7Days('bitcoin');
+
+      expect(trace.messages, isEmpty);
+    });
+  });
+
+  group('contrat rompu - changement de format CoinGecko', () {
+    test('leve InvalidDataException si aucun point recu est exploitable', () async {
+      final client = _FakeHttpClient(
+        statusCode: 200,
+        body: _bodyWithPrices(<Object?>[
+          <Object?>['casse', 'casse'],
+          <Object?>['casse', 'casse'],
+        ]),
+      );
+
+      await expectLater(
+        PriceHistoryRepository(client).fetchLast7Days('bitcoin'),
+        throwsA(
+          isA<InvalidDataException>().having(
+            (InvalidDataException e) => e.reason,
+            'reason',
+            allOf(contains('0'), contains('2')),
+          ),
+        ),
+      );
+    });
+
+    test('une serie vide reste une reponse legitime, pas un contrat rompu', () async {
+      final client = _FakeHttpClient(
+        statusCode: 200,
+        body: _bodyWithPrices(<Object?>[]),
+      );
+
+      final points = await PriceHistoryRepository(
+        client,
+      ).fetchLast7Days('bitcoin');
+
+      expect(points, isEmpty);
+    });
+  });
+
+  group('contrat du repository', () {
+    test('toutes les erreurs sortent en AppException, jamais autre chose', () async {
+      final clients = <_FakeHttpClient>[
+        _FakeHttpClient(statusCode: 500, body: 'boom'),
+        _FakeHttpClient(statusCode: 429, body: 'slow down'),
+        _FakeHttpClient(error: http.ClientException('offline')),
+        _FakeHttpClient(statusCode: 200, body: 'pas du json'),
+        _FakeHttpClient(statusCode: 200, body: jsonEncode(<String>['liste'])),
+      ];
+
+      for (final client in clients) {
+        await expectLater(
+          PriceHistoryRepository(client).fetchLast7Days('bitcoin'),
+          throwsA(isA<AppException>()),
+        );
+      }
+    });
   });
 }

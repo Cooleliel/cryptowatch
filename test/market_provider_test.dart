@@ -6,6 +6,8 @@ import 'package:cryptowatch/features/market/data/repositories/market_repository.
 import 'package:cryptowatch/features/market/domain/crypto.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_provider.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_state.dart';
+import 'package:cryptowatch/shared/errors/app_exception.dart';
+import 'package:cryptowatch/shared/logging/app_logger_provider.dart';
 
 class MockMarketRepository extends Mock implements MarketRepository {}
 
@@ -313,5 +315,107 @@ void main() {
     await container.read(marketProvider.notifier).retry();
     container.read(marketProvider.notifier).setSortField(MarketSortField.price);
     expect(container.read(marketProvider), isA<MarketError>());
+  });
+
+  group('un message juste par type de panne', () {
+    Future<String> messageFor(AppException error) async {
+      when(() => mockRepository.fetchTopCryptos()).thenThrow(error);
+      await container.read(marketProvider.notifier).retry();
+      return (container.read(marketProvider) as MarketError).message;
+    }
+
+    test('NetworkException parle de connexion', () async {
+      final message = await messageFor(const NetworkException('offline'));
+      expect(message.toLowerCase(), contains('connexion'));
+    });
+
+    test('RateLimitException parle de requetes, pas de connexion', () async {
+      final message = await messageFor(const RateLimitException());
+      expect(message.toLowerCase(), contains('requ'));
+      expect(
+        message.toLowerCase(),
+        isNot(contains('connexion')),
+        reason: 'un 429 ne doit pas envoyer chercher un probleme de reseau',
+      );
+    });
+
+    test('RequestTimeoutException parle de delai', () async {
+      final message = await messageFor(
+        const RequestTimeoutException(Duration(seconds: 10)),
+      );
+      expect(message.toLowerCase(), contains('temps'));
+    });
+
+    test('ServerException parle du service', () async {
+      final message = await messageFor(const ServerException(500));
+      expect(message.toLowerCase(), contains('service'));
+    });
+
+    test('InvalidDataException parle de reponse inattendue', () async {
+      final message = await messageFor(const InvalidDataException('format'));
+      expect(message.toLowerCase(), contains('inattendue'));
+    });
+
+    test('deux pannes differentes ne donnent pas le meme message', () async {
+      final network = await messageFor(const NetworkException('offline'));
+      final rateLimit = await messageFor(const RateLimitException());
+      expect(network, isNot(equals(rateLimit)));
+    });
+  });
+
+  group('aucune erreur silencieuse dans le provider', () {
+    late List<String> traces;
+    late List<Object?> causes;
+    late ProviderContainer tracedContainer;
+
+    setUp(() {
+      traces = <String>[];
+      causes = <Object?>[];
+      tracedContainer = ProviderContainer(
+        overrides: [
+          marketRepositoryProvider.overrideWithValue(mockRepository),
+          appLogProvider.overrideWithValue((
+            String message, {
+            Object? error,
+            StackTrace? stackTrace,
+          }) {
+            traces.add(message);
+            causes.add(error);
+          }),
+        ],
+      );
+    });
+
+    tearDown(() => tracedContainer.dispose());
+
+    test('une AppException laisse une trace portant la cause', () async {
+      when(() => mockRepository.fetchTopCryptos())
+          .thenThrow(const RateLimitException());
+
+      await tracedContainer.read(marketProvider.notifier).retry();
+
+      expect(traces, isNotEmpty);
+      expect(causes.whereType<RateLimitException>(), isNotEmpty);
+    });
+
+    test('une erreur inattendue est tracee, pas avalee', () async {
+      final unexpected = StateError('bug interne');
+      when(() => mockRepository.fetchTopCryptos()).thenThrow(unexpected);
+
+      await tracedContainer.read(marketProvider.notifier).retry();
+
+      expect(tracedContainer.read(marketProvider), isA<MarketError>());
+      expect(traces, isNotEmpty, reason: 'rien ne doit disparaitre en silence');
+      expect(causes, contains(unexpected));
+    });
+
+    test('un chargement reussi ne trace rien', () async {
+      when(() => mockRepository.fetchTopCryptos())
+          .thenAnswer((_) async => sampleCryptos);
+
+      await tracedContainer.read(marketProvider.notifier).retry();
+
+      expect(traces, isEmpty);
+    });
   });
 }
