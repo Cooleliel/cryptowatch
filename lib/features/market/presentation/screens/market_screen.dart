@@ -1,30 +1,48 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:cryptowatch/features/market/presentation/providers/market_filter_provider.dart';
+import 'package:cryptowatch/features/market/presentation/providers/market_filter_state.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_provider.dart';
-import 'package:cryptowatch/features/market/presentation/providers/market_state.dart';
+import 'package:cryptowatch/features/market/presentation/providers/visible_cryptos_provider.dart';
 import 'package:cryptowatch/features/market/presentation/widgets/crypto_card.dart';
+import 'package:cryptowatch/shared/errors/app_exception.dart';
 
 class MarketScreen extends ConsumerWidget {
   const MarketScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(marketProvider);
+    final asyncCryptos = ref.watch(marketProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('CryptoWatch')),
-      body: switch (state) {
-        MarketLoading() => const _LoadingView(),
-        MarketError(:final message) => _ErrorView(
-            message: message,
-            onRetry: () => ref.read(marketProvider.notifier).retry(),
-          ),
-        MarketLoaded(:final cryptos) => cryptos.isEmpty
-            ? const Center(child: Text('Aucune crypto trouvée'))
-            : const _LoadedMarketView(),
-      },
+      body: asyncCryptos.when(
+        loading: () => const _LoadingView(),
+        error: (error, _) => _ErrorView(
+          message: _messageFor(error),
+          onRetry: () => ref.invalidate(marketProvider),
+        ),
+        data: (_) => const _LoadedMarketView(),
+      ),
     );
   }
+
+  /// Traduit une panne en phrase lisible. Exhaustif sur [AppException]
+  /// (sealed) : un nouveau type ajouté dans shared/errors force la mise à
+  /// jour de ce switch. Le cas `_` couvre uniquement une erreur qui ne
+  /// serait pas une AppException (filet de sécurité, ne devrait pas arriver
+  /// si le contrat de MarketRepository est respecté).
+  String _messageFor(Object error) => switch (error) {
+    NetworkException() => 'Pas de connexion. Vérifie ton réseau.',
+    RequestTimeoutException() =>
+      'Le serveur met trop de temps à répondre. Réessaie.',
+    RateLimitException() =>
+      'Trop de requêtes envoyées. Réessaie dans une minute.',
+    ServerException() => 'Le service est indisponible pour le moment.',
+    InvalidDataException() => 'Réponse inattendue du service.',
+    _ => 'Une erreur inattendue est survenue.',
+  };
 }
 
 class _LoadedMarketView extends ConsumerWidget {
@@ -32,10 +50,8 @@ class _LoadedMarketView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(marketProvider);
-    if (state is! MarketLoaded) return const SizedBox.shrink();
-
-    final visible = state.visibleCryptos;
+    final visible = ref.watch(visibleCryptosProvider).value ?? const [];
+    final filter = ref.watch(marketFilterProvider);
 
     return Column(
       children: [
@@ -44,7 +60,7 @@ class _LoadedMarketView extends ConsumerWidget {
           child: TextField(
             key: const Key('market-search-field'),
             textInputAction: TextInputAction.search,
-            onChanged: ref.read(marketProvider.notifier).setQuery,
+            onChanged: ref.read(marketFilterProvider.notifier).setQuery,
             decoration: const InputDecoration(
               hintText: 'Rechercher un nom ou un symbole',
               prefixIcon: Icon(Icons.search),
@@ -52,7 +68,7 @@ class _LoadedMarketView extends ConsumerWidget {
             ),
           ),
         ),
-        const _SortBar(),
+        _SortBar(filter: filter),
         Expanded(
           child: visible.isEmpty
               ? const Center(child: Text('Aucune crypto trouvée'))
@@ -68,13 +84,12 @@ class _LoadedMarketView extends ConsumerWidget {
 }
 
 class _SortBar extends ConsumerWidget {
-  const _SortBar();
+  const _SortBar({required this.filter});
+
+  final MarketFilterState filter;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(marketProvider);
-    if (state is! MarketLoaded) return const SizedBox.shrink();
-
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Wrap(
@@ -85,19 +100,19 @@ class _SortBar extends ConsumerWidget {
             key: const Key('market-sort-price'),
             label: 'Prix',
             field: MarketSortField.price,
-            state: state,
+            filter: filter,
           ),
           _SortChip(
             key: const Key('market-sort-variation'),
             label: 'Variation',
             field: MarketSortField.variation,
-            state: state,
+            filter: filter,
           ),
           _SortChip(
             key: const Key('market-sort-market-cap'),
             label: 'Cap',
             field: MarketSortField.marketCap,
-            state: state,
+            filter: filter,
           ),
         ],
       ),
@@ -110,16 +125,16 @@ class _SortChip extends ConsumerWidget {
     super.key,
     required this.label,
     required this.field,
-    required this.state,
+    required this.filter,
   });
 
   final String label;
   final MarketSortField field;
-  final MarketLoaded state;
+  final MarketFilterState filter;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final selected = state.sortField == field;
+    final selected = filter.sortField == field;
     return FilterChip(
       label: Row(
         mainAxisSize: MainAxisSize.min,
@@ -128,14 +143,17 @@ class _SortChip extends ConsumerWidget {
           if (selected) ...[
             const SizedBox(width: 4),
             Icon(
-              state.sortDescending ? Icons.arrow_downward : Icons.arrow_upward,
+              filter.sortDescending
+                  ? Icons.arrow_downward
+                  : Icons.arrow_upward,
               size: 16,
             ),
           ],
         ],
       ),
       selected: selected,
-      onSelected: (_) => ref.read(marketProvider.notifier).setSortField(field),
+      onSelected: (_) =>
+          ref.read(marketFilterProvider.notifier).setSortField(field),
     );
   }
 }
@@ -172,7 +190,11 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 48),
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.red,
+              size: 48,
+            ),
             const SizedBox(height: 16),
             Text(
               'Impossible de charger les cours',

@@ -8,6 +8,8 @@ import 'package:cryptowatch/features/market/domain/crypto.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_provider.dart';
 import 'package:cryptowatch/features/market/presentation/screens/market_screen.dart';
 
+import 'helpers/fake_realtime_overrides.dart';
+
 class MockMarketRepository extends Mock implements MarketRepository {}
 
 void main() {
@@ -35,6 +37,7 @@ void main() {
       ProviderScope(
         overrides: [
           marketRepositoryProvider.overrideWithValue(mockRepository),
+          ...fakeRealtimeOverrides(),
         ],
         child: const MaterialApp(home: MarketScreen()),
       ),
