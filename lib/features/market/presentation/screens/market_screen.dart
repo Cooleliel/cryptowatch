@@ -50,7 +50,16 @@ class _LoadedMarketView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final visible = ref.watch(visibleCryptosProvider).value ?? const [];
+    // On extrait uniquement les symboles depuis visibleCryptosProvider.
+    // CryptoCard observe elle-même son propre objet Crypto dans marketProvider
+    // (T-08b) : passer le symbole plutôt que l'objet Crypto entier évite que
+    // la ListView ne rebuild toutes ses cartes quand une seule crypto change.
+    final symbols = ref
+            .watch(visibleCryptosProvider)
+            .value
+            ?.map((c) => c.symbol)
+            .toList() ??
+        const [];
     final filter = ref.watch(marketFilterProvider);
 
     return Column(
@@ -70,12 +79,12 @@ class _LoadedMarketView extends ConsumerWidget {
         ),
         _SortBar(filter: filter),
         Expanded(
-          child: visible.isEmpty
+          child: symbols.isEmpty
               ? const Center(child: Text('Aucune crypto trouvée'))
               : ListView.builder(
-                  itemCount: visible.length,
+                  itemCount: symbols.length,
                   itemBuilder: (context, index) =>
-                      CryptoCard(crypto: visible[index]),
+                      CryptoCard(symbol: symbols[index]),
                 ),
         ),
       ],
