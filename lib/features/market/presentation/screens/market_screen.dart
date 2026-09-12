@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import 'package:cryptowatch/app/router/router_app.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_filter_provider.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_filter_state.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_provider.dart';
@@ -74,8 +76,18 @@ class _LoadedMarketView extends ConsumerWidget {
               ? const Center(child: Text('Aucune crypto trouvée'))
               : ListView.builder(
                   itemCount: visible.length,
-                  itemBuilder: (context, index) =>
-                      CryptoCard(crypto: visible[index]),
+                  itemBuilder: (context, index) {
+                    final crypto = visible[index];
+                    return CryptoCard(
+                      key: Key('crypto-card-${crypto.id}'),
+                      crypto: crypto,
+                      onTap: () => context.pushNamed(
+                        RouteNames.cryptoDetail,
+                        pathParameters: {'id': crypto.id},
+                        extra: crypto,
+                      ),
+                    );
+                  },
                 ),
         ),
       ],
