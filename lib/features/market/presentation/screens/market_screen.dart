@@ -52,6 +52,16 @@ class _LoadedMarketView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // On observe visibleCryptosProvider pour la LISTE (symboles visibles,
+    // ordre, filtre/tri) uniquement. CryptoCard observe elle-même son propre
+    // objet Crypto dans marketProvider via `select` (T-08b) : on lui passe
+    // le symbole, pas l'objet Crypto entier, pour que la mise à jour d'une
+    // seule crypto ne rebuild pas la ListView complète — seule la carte
+    // concernée se redessine.
+    //
+    // On garde ici la liste d'objets Crypto (et non seulement les symboles)
+    // car `crypto.id` sert de Key stable et de paramètre de route pour la
+    // navigation vers la fiche détail (T-06).
     final visible = ref.watch(visibleCryptosProvider).value ?? const [];
     final filter = ref.watch(marketFilterProvider);
 
@@ -80,7 +90,7 @@ class _LoadedMarketView extends ConsumerWidget {
                     final crypto = visible[index];
                     return CryptoCard(
                       key: Key('crypto-card-${crypto.id}'),
-                      crypto: crypto,
+                      symbol: crypto.symbol,
                       onTap: () => context.pushNamed(
                         RouteNames.cryptoDetail,
                         pathParameters: {'id': crypto.id},
