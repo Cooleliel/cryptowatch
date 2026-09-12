@@ -39,13 +39,15 @@ class MarketNotifier extends AsyncNotifier<List<Crypto>> {
     final currentCryptos = state.value;
     if (currentCryptos == null) return;
 
-    state = AsyncData([
-      for (final crypto in currentCryptos)
-        if (crypto.symbol == ticker.symbol)
-          crypto.updateFromBinanceTicker(ticker.raw)
-        else
-          crypto,
-    ]);
+    final index = currentCryptos.indexWhere((c) => c.symbol == ticker.symbol);
+    if (index == -1) return; // symbole non géré : on ignore, aucun rebuild
+
+    final updatedCryptos = List<Crypto>.of(currentCryptos);
+    updatedCryptos[index] = updatedCryptos[index].updateFromBinanceTicker(
+      ticker.raw,
+    );
+
+    state = AsyncData(updatedCryptos);
   }
 }
 
