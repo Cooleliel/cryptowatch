@@ -6,7 +6,7 @@ import 'package:cryptowatch/features/crypto_detail/data/repositories/price_histo
 import 'package:cryptowatch/features/crypto_detail/domain/price_point.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/providers/price_history_provider.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/providers/price_history_state.dart';
-import 'package:cryptowatch/features/market/data/market_exception.dart';
+import 'package:cryptowatch/shared/errors/app_exception.dart';
 
 class MockPriceHistoryRepository extends Mock
     implements PriceHistoryRepository {}
