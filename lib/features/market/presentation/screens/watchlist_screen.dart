@@ -11,7 +11,8 @@ class WatchlistScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final favorites = context.watch<FavoritesCubit>().state.favoriteIds;
+    final favorites =
+      context.watch<FavoritesCubit?>()?.state.favoriteIds ?? const <String>{};
     final watchlist = cryptos.where((crypto) => favorites.contains(crypto.id)).toList();
 
     if (watchlist.isEmpty) {
