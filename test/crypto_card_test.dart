@@ -74,4 +74,26 @@ void main() {
 
     expect(find.text('?'), findsOneWidget);
   });
+
+  testWidgets('déclenche onTap au tap', (tester) async {
+    var tapped = false;
+    final crypto = Crypto(
+      id: 'bitcoin',
+      name: 'Bitcoin',
+      symbol: 'btc',
+      currentPrice: 45000.0,
+      lastUpdated: DateTime(2026, 1, 1),
+    );
+
+    await tester.pumpWidget(
+      wrap(
+        CryptoCard(
+          crypto: crypto,
+          onTap: () => tapped = true,
+        ),
+      ),
+    );
+    await tester.tap(find.text('Bitcoin'));
+    expect(tapped, isTrue);
+  });
 }

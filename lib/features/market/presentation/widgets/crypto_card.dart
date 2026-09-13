@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cryptowatch/features/market/domain/crypto.dart';
 
 class CryptoCard extends StatelessWidget {
-  const CryptoCard({super.key, required this.crypto});
+  const CryptoCard({super.key, required this.crypto, this.onTap});
 
   final Crypto crypto;
+  final VoidCallback? onTap;
 
   // Palette fixe pour un avatar coloré déterministe par crypto,
   // sans dépendre d'une image (souvent absente côté Binance).
@@ -29,64 +30,74 @@ class CryptoCard extends StatelessWidget {
         ? Theme.of(context).colorScheme.onSurfaceVariant
         : (isPositive ? Colors.green : Colors.red);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: _avatarColor(),
-            child: Text(
-              crypto.symbol.isNotEmpty ? crypto.symbol[0].toUpperCase() : '?',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  crypto.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  crypto.symbol.toUpperCase(),
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: _avatarColor(),
+                child: Text(
+                  crypto.symbol.isNotEmpty
+                      ? crypto.symbol[0].toUpperCase()
+                      : '?',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                '\$${crypto.currentPrice.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              if (variation != null)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      isPositive ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-                      color: variationColor,
-                      size: 18,
+                    Text(
+                      crypto.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      '${variation.abs().toStringAsFixed(1)} %',
-                      style: TextStyle(color: variationColor),
+                      crypto.symbol.toUpperCase(),
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '\$${crypto.currentPrice.toStringAsFixed(2)}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  if (variation != null)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isPositive
+                              ? Icons.arrow_drop_up
+                              : Icons.arrow_drop_down,
+                          color: variationColor,
+                          size: 18,
+                        ),
+                        Text(
+                          '${variation.abs().toStringAsFixed(1)} %',
+                          style: TextStyle(color: variationColor),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

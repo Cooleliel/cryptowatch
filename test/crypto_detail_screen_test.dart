@@ -10,6 +10,7 @@ import 'package:cryptowatch/features/crypto_detail/domain/price_point.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/providers/price_history_provider.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/screens/crypto_detail_screen.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/widgets/week_line_chart.dart';
+import 'package:cryptowatch/features/market/domain/crypto.dart';
 import 'package:cryptowatch/shared/errors/app_exception.dart';
 
 class MockPriceHistoryRepository extends Mock
@@ -28,12 +29,14 @@ void main() {
     mockRepository = MockPriceHistoryRepository();
   });
 
-  Widget app() {
+  Widget app({Crypto? crypto, String coinId = 'bitcoin'}) {
     return ProviderScope(
       overrides: [
         priceHistoryRepositoryProvider.overrideWithValue(mockRepository),
       ],
-      child: const MaterialApp(home: CryptoDetailScreen()),
+      child: MaterialApp(
+        home: CryptoDetailScreen(coinId: coinId, crypto: crypto),
+      ),
     );
   }
 
@@ -76,5 +79,37 @@ void main() {
 
     expect(find.text('Réessayer'), findsOneWidget);
     expect(find.byType(WeekLineChart), findsNothing);
+  });
+
+  testWidgets('affiche le Crypto passé par la liste, pas le mockup Bitcoin',
+      (WidgetTester tester) async {
+    when(() => mockRepository.fetchLast7Days('ethereum'))
+        .thenAnswer((_) async => samplePoints);
+
+    final ethereum = Crypto(
+      id: 'ethereum',
+      name: 'Ethereum',
+      symbol: 'eth',
+      currentPrice: 3000,
+      priceChangePercentage24h: -1.5,
+      high24h: 3100,
+      low24h: 2900,
+      volume24h: 18200000000,
+      marketCap: 360000000000,
+      marketCapRank: 2,
+      lastUpdated: DateTime(2026, 1, 1),
+    );
+
+    await tester.pumpWidget(app(crypto: ethereum, coinId: 'ethereum'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ethereum'), findsOneWidget);
+    expect(find.text('Rang 2'), findsOneWidget);
+    expect(find.text(r'$3 000,00'), findsOneWidget);
+    expect(find.text('-1,5 % sur 24 h'), findsOneWidget);
+    expect(find.text(r'$3 100,00'), findsOneWidget);
+    expect(find.text(r'$360 Md'), findsOneWidget);
+    expect(find.text('Bitcoin'), findsNothing);
+    expect(find.byType(WeekLineChart), findsOneWidget);
   });
 }
