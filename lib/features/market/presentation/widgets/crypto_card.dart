@@ -1,5 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:cryptowatch/features/market/domain/crypto.dart';
+import 'package:cryptowatch/features/market/presentation/favorites/favorites_cubit.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 class CryptoCard extends StatelessWidget {
   const CryptoCard({super.key, required this.crypto, this.onTap});
@@ -7,14 +9,12 @@ class CryptoCard extends StatelessWidget {
   final Crypto crypto;
   final VoidCallback? onTap;
 
-  // Palette fixe pour un avatar coloré déterministe par crypto,
-  // sans dépendre d'une image (souvent absente côté Binance).
   static const List<Color> _palette = [
-    Color(0xFFF7931A), // orange (Bitcoin-like)
-    Color(0xFF627EEA), // bleu (Ethereum-like)
-    Color(0xFF26A17B), // vert (Tether-like)
-    Color(0xFFF0B90B), // jaune (BNB-like)
-    Color(0xFF9945FF), // violet (Solana-like)
+    Color(0xFFF7931A),
+    Color(0xFF627EEA),
+    Color(0xFF26A17B),
+    Color(0xFFF0B90B),
+    Color(0xFF9945FF),
   ];
 
   Color _avatarColor() {
@@ -29,6 +29,9 @@ class CryptoCard extends StatelessWidget {
     final variationColor = variation == null
         ? Theme.of(context).colorScheme.onSurfaceVariant
         : (isPositive ? Colors.green : Colors.red);
+    final isFavorite = context.select<FavoritesCubit?, bool>(
+      (cubit) => cubit?.isFavorite(crypto.id) ?? false,
+    );
 
     return Material(
       color: Colors.transparent,
@@ -94,6 +97,16 @@ class CryptoCard extends StatelessWidget {
                       ],
                     ),
                 ],
+              ),
+              GestureDetector(
+                onTap: () {
+                  context.read<FavoritesCubit?>()?.toggleFavorite(crypto.id);
+                },
+                child: Icon(
+                  isFavorite ? Icons.star : Icons.star_border,
+                  color: isFavorite ? Colors.amber : Colors.grey,
+                  size: 30,
+                ),
               ),
             ],
           ),
