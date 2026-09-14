@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cryptowatch/features/market/domain/crypto.dart';
+import 'package:cryptowatch/features/market/presentation/favorites/favorites_cubit.dart';
 import 'package:cryptowatch/features/market/presentation/providers/crypto_flash_provider.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_provider.dart';
 
@@ -13,10 +15,6 @@ import 'package:cryptowatch/features/market/presentation/providers/market_provid
 /// et non la liste entière. Conséquence : seule la carte dont le prix change
 /// se redessine. Les 49 autres ne bougent pas, même si le provider émet un
 /// nouvel état.
-///
-/// Sans ce découpage, chaque tick Binance forçait le rebuild de toutes les
-/// cartes visibles, car `_LoadedMarketView` re-construisait toute la
-/// `ListView` à chaque mise à jour du state.
 ///
 /// **Flash vert / rouge**
 ///
@@ -33,34 +31,29 @@ import 'package:cryptowatch/features/market/presentation/providers/market_provid
 /// fond coloré. Cela évite le flash parasite qui apparaîtrait sinon à
 /// l'ouverture de l'écran, alors qu'aucune variation n'a encore eu lieu.
 ///
+/// **Favoris (dev)**
+///
+/// La carte observe [FavoritesCubit] via `context.select` pour afficher
+/// l'étoile de favori. Le tap bascule l'état favori sans rebuild global.
+///
 /// **Navigation (T-06)**
 ///
-/// [onTap] ouvre la fiche détail de la crypto. La carte reste enveloppée
-/// dans `Material` + `InkWell` pour l'effet d'ondulation au tap, à
-/// l'intérieur du fond animé du flash — l'ordre compte : le flash colore le
-/// fond, l'`InkWell` dessine son ondulation par-dessus.
+/// [onTap] ouvre la fiche détail de la crypto.
 class CryptoCard extends ConsumerWidget {
   const CryptoCard({super.key, required this.symbol, this.onTap});
 
   /// Symbole Binance en minuscules (ex: 'btc', 'eth').
-  ///
-  /// La carte utilise le symbole — et non l'objet [Crypto] entier — pour
-  /// cibler sa propre ligne dans [marketProvider] via `select`. Passer
-  /// l'objet entier forcerait un rebuild dès que n'importe quel champ
-  /// changerait, même si le prix, la variation et le nom restent identiques.
   final String symbol;
 
   /// Appelé au tap sur la carte. `null` désactive l'ondulation et le tap.
   final VoidCallback? onTap;
 
-  // Palette fixe pour un avatar coloré déterministe par crypto,
-  // sans dépendre d'une image (souvent absente côté Binance).
   static const List<Color> _palette = [
-    Color(0xFFF7931A), // orange (Bitcoin-like)
-    Color(0xFF627EEA), // bleu (Ethereum-like)
-    Color(0xFF26A17B), // vert (Tether-like)
-    Color(0xFFF0B90B), // jaune (BNB-like)
-    Color(0xFF9945FF), // violet (Solana-like)
+    Color(0xFFF7931A),
+    Color(0xFF627EEA),
+    Color(0xFF26A17B),
+    Color(0xFFF0B90B),
+    Color(0xFF9945FF),
   ];
 
   Color _avatarColor() {
@@ -70,10 +63,6 @@ class CryptoCard extends ConsumerWidget {
 
   /// Lit la crypto correspondant à [symbol] dans [marketProvider] et
   /// déclenche le flash si le prix a changé.
-  ///
-  /// Le `select` limite le rebuild de cette carte aux seuls changements
-  /// de l'objet `Crypto` associé à ce symbole. Si Binance met à jour BTC,
-  /// seule la carte BTC entre dans `_watchCrypto`.
   Crypto? _watchCrypto(WidgetRef ref) {
     final crypto = ref.watch(
       marketProvider.select(
@@ -84,11 +73,8 @@ class CryptoCard extends ConsumerWidget {
       ),
     );
 
-    // _sentinel indique que le symbole n'est pas dans la liste (après filtre
-    // ou avant chargement). On retourne null : la carte ne s'affiche pas.
     if (crypto == null || identical(crypto, _sentinel)) return null;
 
-    // Déclenche le flash (comparaison avec le prix précédent dans le notifier).
     ref.read(cryptoFlashProvider(symbol).notifier).trigger(crypto.currentPrice);
 
     return crypto;
@@ -98,8 +84,6 @@ class CryptoCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final crypto = _watchCrypto(ref);
 
-    // Garde-fou : ne devrait pas arriver en usage normal car la liste est
-    // construite à partir des symboles présents dans marketProvider.
     if (crypto == null) return const SizedBox.shrink();
 
     final FlashState flash = ref.watch(cryptoFlashProvider(symbol));
@@ -109,11 +93,10 @@ class CryptoCard extends ConsumerWidget {
     final variationColor = variation == null
         ? Theme.of(context).colorScheme.onSurfaceVariant
         : (isPositive ? Colors.green : Colors.red);
+    final isFavorite = context.select<FavoritesCubit?, bool>(
+      (cubit) => cubit?.isFavorite(crypto.id) ?? false,
+    );
 
-    // Couleur de fond animée selon l'état flash.
-    // AnimatedContainer gère la transition (200 ms par défaut) pour un
-    // fondu entrant doux ; l'extinction à 600 ms produit également un
-    // fondu sortant sans code supplémentaire.
     final flashColor = switch (flash) {
       FlashState.up => Colors.green.withAlpha(40),
       FlashState.down => Colors.red.withAlpha(40),
@@ -186,6 +169,16 @@ class CryptoCard extends ConsumerWidget {
                       ),
                   ],
                 ),
+                GestureDetector(
+                  onTap: () {
+                    context.read<FavoritesCubit?>()?.toggleFavorite(crypto.id);
+                  },
+                  child: Icon(
+                    isFavorite ? Icons.star : Icons.star_border,
+                    color: isFavorite ? Colors.amber : Colors.grey,
+                    size: 30,
+                  ),
+                ),
               ],
             ),
           ),
@@ -196,10 +189,7 @@ class CryptoCard extends ConsumerWidget {
 }
 
 /// Objet sentinelle utilisé pour distinguer « symbole absent de la liste »
-/// (firstWhere avec orElse) de `null` (provider pas encore chargé).
-///
-/// On évite ainsi une exception dans `select` quand le filtre de recherche
-/// cache temporairement une crypto ou quand le provider charge.
+/// de `null` (provider pas encore chargé).
 final _sentinel = Crypto(
   id: '__sentinel__',
   name: '',
