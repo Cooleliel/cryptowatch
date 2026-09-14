@@ -1,20 +1,22 @@
 import 'package:cryptowatch/features/market/domain/crypto.dart';
-import 'package:cryptowatch/features/market/presentation/favorites/favorites_cubit.dart';
+import 'package:cryptowatch/features/watchlist/presentation/providers/favorites_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class CryptoCard extends StatelessWidget {
+class CryptoCard extends ConsumerWidget {
   const CryptoCard({super.key, required this.crypto, this.onTap});
 
   final Crypto crypto;
   final VoidCallback? onTap;
 
+  // Palette fixe pour un avatar coloré déterministe par crypto,
+  // sans dépendre d'une image (souvent absente côté Binance).
   static const List<Color> _palette = [
-    Color(0xFFF7931A),
-    Color(0xFF627EEA),
-    Color(0xFF26A17B),
-    Color(0xFFF0B90B),
-    Color(0xFF9945FF),
+    Color(0xFFF7931A), // orange (Bitcoin-like)
+    Color(0xFF627EEA), // bleu (Ethereum-like)
+    Color(0xFF26A17B), // vert (Tether-like)
+    Color(0xFFF0B90B), // jaune (BNB-like)
+    Color(0xFF9945FF), // violet (Solana-like)
   ];
 
   Color _avatarColor() {
@@ -23,14 +25,17 @@ class CryptoCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final variation = crypto.priceChangePercentage24h;
     final isPositive = (variation ?? 0) >= 0;
     final variationColor = variation == null
         ? Theme.of(context).colorScheme.onSurfaceVariant
         : (isPositive ? Colors.green : Colors.red);
-    final isFavorite = context.select<FavoritesCubit?, bool>(
-      (cubit) => cubit?.isFavorite(crypto.id) ?? false,
+
+    // `select` : la carte ne se redessine que si SON statut favori change,
+    // pas à chaque modification du Set complet.
+    final bool isFavorite = ref.watch(
+      favoritesProvider.select((Set<String> ids) => ids.contains(crypto.id)),
     );
 
     return Material(
@@ -98,14 +103,14 @@ class CryptoCard extends StatelessWidget {
                     ),
                 ],
               ),
-              GestureDetector(
-                onTap: () {
-                  context.read<FavoritesCubit?>()?.toggleFavorite(crypto.id);
-                },
-                child: Icon(
+              IconButton(
+                key: Key('favorite-toggle-${crypto.id}'),
+                onPressed: () => ref
+                    .read(favoritesProvider.notifier)
+                    .toggleFavorite(crypto.id),
+                icon: Icon(
                   isFavorite ? Icons.star : Icons.star_border,
                   color: isFavorite ? Colors.amber : Colors.grey,
-                  size: 30,
                 ),
               ),
             ],
