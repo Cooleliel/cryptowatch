@@ -1,48 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:cryptowatch/features/market/domain/crypto.dart';
-import 'package:cryptowatch/features/market/presentation/favorites/favorites_cubit.dart';
 import 'package:cryptowatch/features/market/presentation/providers/crypto_flash_provider.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_provider.dart';
+import 'package:cryptowatch/features/watchlist/presentation/providers/favorites_provider.dart';
 
 /// Carte d'une crypto dans la liste du marché.
 ///
 /// **Architecture T-08b — granularité de rebuild**
-///
-/// La carte observe [marketProvider] via un `select` sur son propre symbole,
-/// et non la liste entière. Conséquence : seule la carte dont le prix change
-/// se redessine. Les 49 autres ne bougent pas, même si le provider émet un
-/// nouvel état.
+/// La carte observe [marketProvider] via un `select` sur son propre symbole :
+/// seule la carte dont le prix change se redessine, jamais la liste entière.
 ///
 /// **Flash vert / rouge**
+/// Chaque carte possède son instance de [CryptoFlashNotifier]
+/// (`cryptoFlashProvider(symbol)`). Le déclenchement passe par `ref.listen`
+/// (jamais pendant le build : modifier un provider observé en plein build
+/// provoquerait un markNeedsBuild-during-build). Le premier prix reçu est
+/// mémorisé sans flash (pas de fond coloré parasite au chargement).
 ///
-/// Chaque carte possède sa propre instance de [CryptoFlashNotifier]
-/// (via `cryptoFlashProvider(symbol)`). Quand [_watchCrypto] détecte un
-/// nouveau prix, il appelle `trigger`, qui :
-///   1. compare avec le prix précédent mémorisé dans le notifier,
-///   2. positionne [FlashState.up] ou [FlashState.down],
-///   3. programme l'extinction après [flashDuration] (600 ms).
-///
-/// **Pas de flash au premier chargement**
-///
-/// Le premier appel à `trigger` mémorise le prix initial sans afficher de
-/// fond coloré. Cela évite le flash parasite qui apparaîtrait sinon à
-/// l'ouverture de l'écran, alors qu'aucune variation n'a encore eu lieu.
-///
-/// **Favoris (dev)**
-///
-/// La carte observe [FavoritesCubit] via `context.select` pour afficher
-/// l'étoile de favori. Le tap bascule l'état favori sans rebuild global.
-///
-/// **Navigation (T-06)**
-///
-/// [onTap] ouvre la fiche détail de la crypto.
+/// **Favoris (T-09a)** : étoile branchée sur [favoritesProvider], avec
+/// `select` — la carte ne se redessine que si SON statut favori change.
 class CryptoCard extends ConsumerWidget {
   const CryptoCard({super.key, required this.symbol, this.onTap});
 
-  /// Symbole Binance en minuscules (ex: 'btc', 'eth').
+  /// Symbole en minuscules (ex: 'btc', 'eth').
   final String symbol;
 
   /// Appelé au tap sur la carte. `null` désactive l'ondulation et le tap.
@@ -61,29 +43,29 @@ class CryptoCard extends ConsumerWidget {
     return _palette[index];
   }
 
-  /// Lit la crypto correspondant à [symbol] dans [marketProvider] et
-  /// déclenche le flash si le prix a changé.
-  Crypto? _watchCrypto(WidgetRef ref) {
-    final crypto = ref.watch(
-      marketProvider.select(
-        (asyncValue) => asyncValue.value?.firstWhere(
-          (c) => c.symbol == symbol,
-          orElse: () => _sentinel,
-        ),
-      ),
+  /// Sélectionne la crypto de CETTE carte dans l'état du marché.
+  Crypto? _selectCrypto(AsyncValue<List<Crypto>> asyncValue) {
+    final crypto = asyncValue.value?.firstWhere(
+      (c) => c.symbol == symbol,
+      orElse: () => _sentinel,
     );
-
     if (crypto == null || identical(crypto, _sentinel)) return null;
-
-    ref.read(cryptoFlashProvider(symbol).notifier).trigger(crypto.currentPrice);
-
     return crypto;
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final crypto = _watchCrypto(ref);
+    // Déclenchement du flash HORS build : le listener s'exécute après la
+    // mise à jour du provider, jamais pendant la construction de la carte.
+    ref.listen<Crypto?>(marketProvider.select(_selectCrypto), (previous, next) {
+      if (next != null) {
+        ref
+            .read(cryptoFlashProvider(symbol).notifier)
+            .trigger(next.currentPrice);
+      }
+    });
 
+    final crypto = ref.watch(marketProvider.select(_selectCrypto));
     if (crypto == null) return const SizedBox.shrink();
 
     final FlashState flash = ref.watch(cryptoFlashProvider(symbol));
@@ -93,8 +75,9 @@ class CryptoCard extends ConsumerWidget {
     final variationColor = variation == null
         ? Theme.of(context).colorScheme.onSurfaceVariant
         : (isPositive ? Colors.green : Colors.red);
-    final isFavorite = context.select<FavoritesCubit?, bool>(
-      (cubit) => cubit?.isFavorite(crypto.id) ?? false,
+
+    final bool isFavorite = ref.watch(
+      favoritesProvider.select((Set<String> ids) => ids.contains(crypto.id)),
     );
 
     final flashColor = switch (flash) {
@@ -104,6 +87,7 @@ class CryptoCard extends ConsumerWidget {
     };
 
     return AnimatedContainer(
+      key: Key('crypto-card-surface-${crypto.id}'),
       duration: const Duration(milliseconds: 200),
       color: flashColor,
       child: Material(
@@ -169,11 +153,12 @@ class CryptoCard extends ConsumerWidget {
                       ),
                   ],
                 ),
-                GestureDetector(
-                  onTap: () {
-                    context.read<FavoritesCubit?>()?.toggleFavorite(crypto.id);
-                  },
-                  child: Icon(
+                IconButton(
+                  key: Key('favorite-toggle-${crypto.id}'),
+                  onPressed: () => ref
+                      .read(favoritesProvider.notifier)
+                      .toggleFavorite(crypto.id),
+                  icon: Icon(
                     isFavorite ? Icons.star : Icons.star_border,
                     color: isFavorite ? Colors.amber : Colors.grey,
                     size: 30,
@@ -188,8 +173,8 @@ class CryptoCard extends ConsumerWidget {
   }
 }
 
-/// Objet sentinelle utilisé pour distinguer « symbole absent de la liste »
-/// de `null` (provider pas encore chargé).
+/// Sentinelle : distingue « symbole absent de la liste » de « provider pas
+/// encore chargé » (null).
 final _sentinel = Crypto(
   id: '__sentinel__',
   name: '',

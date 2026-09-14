@@ -1,11 +1,10 @@
 import 'package:cryptowatch/app/router/router_app.dart';
 import 'package:cryptowatch/app/theme/app_theme.dart';
-import 'package:cryptowatch/features/market/presentation/favorites/favorites_cubit.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+/// Widget racine de l'application.
 class CryptoWatchApp extends ConsumerWidget {
   const CryptoWatchApp({super.key});
 
@@ -13,16 +12,13 @@ class CryptoWatchApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final GoRouter router = ref.watch(appRouterProvider);
 
-    return BlocProvider(
-      create: (_) => FavoritesCubit(),
-      child: MaterialApp.router(
-        title: 'CryptoWatch',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light,
-        darkTheme: AppTheme.dark,
-        themeMode: ThemeMode.system,
-        routerConfig: router,
-      ),
+    return MaterialApp.router(
+      title: 'CryptoWatch',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
+      routerConfig: router,
     );
   }
 }

@@ -31,7 +31,9 @@ Widget wrap(String symbol, List<Crypto> cryptos, {VoidCallback? onTap}) =>
         marketProvider.overrideWith(() => _FakeMarketNotifier(cryptos)),
       ],
       child: MaterialApp(
-        home: Scaffold(body: CryptoCard(symbol: symbol, onTap: onTap)),
+        home: Scaffold(
+          body: CryptoCard(symbol: symbol, onTap: onTap),
+        ),
       ),
     );
 
@@ -57,8 +59,9 @@ void main() {
     expect(find.text('\$45230.50'), findsOneWidget);
   });
 
-  testWidgets('affiche une flèche verte pour une variation positive',
-      (tester) async {
+  testWidgets('affiche une flèche verte pour une variation positive', (
+    tester,
+  ) async {
     final crypto = Crypto(
       id: 'bitcoin',
       name: 'Bitcoin',
@@ -76,8 +79,9 @@ void main() {
     expect(find.text('2.4 %'), findsOneWidget);
   });
 
-  testWidgets('affiche une flèche rouge pour une variation négative',
-      (tester) async {
+  testWidgets('affiche une flèche rouge pour une variation négative', (
+    tester,
+  ) async {
     final crypto = Crypto(
       id: 'bnb',
       name: 'BNB',
@@ -137,12 +141,27 @@ void main() {
       lastUpdated: DateTime(2026, 1, 1),
     );
 
-    await tester.pumpWidget(
-      wrap('btc', [crypto], onTap: () => tapped = true),
-    );
+    await tester.pumpWidget(wrap('btc', [crypto], onTap: () => tapped = true));
     await tester.pump(); // settle AsyncNotifier
 
     await tester.tap(find.text('Bitcoin'));
     expect(tapped, isTrue);
+  });
+
+  testWidgets("l'étoile toggle le statut favori", (tester) async {
+    final crypto = Crypto(
+      id: 'bitcoin',
+      name: 'Bitcoin',
+      symbol: 'btc',
+      currentPrice: 45000.0,
+      lastUpdated: DateTime(2026, 1, 1),
+    );
+    await tester.pumpWidget(wrap('btc', [crypto]));
+    await tester.pump();
+
+    expect(find.byIcon(Icons.star_border), findsOneWidget);
+    await tester.tap(find.byKey(const Key('favorite-toggle-bitcoin')));
+    await tester.pump();
+    expect(find.byIcon(Icons.star), findsOneWidget);
   });
 }
