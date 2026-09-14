@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+/// Widget racine de l'application.
 class CryptoWatchApp extends ConsumerWidget {
   const CryptoWatchApp({super.key});
 

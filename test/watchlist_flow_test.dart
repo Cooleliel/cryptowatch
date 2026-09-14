@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:cryptowatch/app/app.dart';
 import 'package:cryptowatch/features/market/data/repositories/market_repository.dart';
 import 'package:cryptowatch/features/market/domain/crypto.dart';
 import 'package:cryptowatch/features/market/presentation/providers/market_provider.dart';
-import 'package:cryptowatch/features/market/presentation/screens/market_screen.dart';
 
 import 'helpers/fake_realtime_overrides.dart';
 
@@ -32,18 +32,28 @@ void main() {
     ),
   ];
 
-  Future<void> pumpMarket(WidgetTester tester) async {
+  Future<void> pumpApp(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           marketRepositoryProvider.overrideWithValue(mockRepository),
           ...fakeRealtimeOverrides(),
         ],
-        child: const MaterialApp(home: MarketScreen()),
+        child: const CryptoWatchApp(),
       ),
     );
     await tester.pump();
     await tester.pump();
+  }
+
+  Future<void> goToWatchlistTab(WidgetTester tester) async {
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Watchlist'),
+      ),
+    );
+    await tester.pumpAndSettle();
   }
 
   setUp(() {
@@ -53,54 +63,30 @@ void main() {
     ).thenAnswer((_) async => sampleCryptos);
   });
 
-  testWidgets('affiche le champ de recherche une fois le marché chargé', (
-    tester,
-  ) async {
-    await pumpMarket(tester);
+  testWidgets('une crypto étoilée apparaît dans la watchlist', (tester) async {
+    await pumpApp(tester);
 
-    expect(find.byKey(const Key('market-search-field')), findsOneWidget);
-    expect(find.text('Bitcoin'), findsOneWidget);
-    expect(find.text('Ethereum'), findsOneWidget);
-  });
-
-  testWidgets('filtre la liste par nom', (tester) async {
-    await pumpMarket(tester);
-
-    await tester.enterText(
-      find.byKey(const Key('market-search-field')),
-      'bit',
-    );
+    await tester.tap(find.byKey(const Key('favorite-toggle-bitcoin')));
     await tester.pump();
+
+    await goToWatchlistTab(tester);
 
     expect(find.text('Bitcoin'), findsOneWidget);
     expect(find.text('Ethereum'), findsNothing);
   });
 
-  testWidgets('filtre la liste par symbole', (tester) async {
-    await pumpMarket(tester);
+  testWidgets('retirer le favori vide la watchlist', (tester) async {
+    await pumpApp(tester);
 
-    await tester.enterText(
-      find.byKey(const Key('market-search-field')),
-      'ETH',
-    );
+    await tester.tap(find.byKey(const Key('favorite-toggle-bitcoin')));
+    await tester.pump();
+    await goToWatchlistTab(tester);
+    expect(find.text('Bitcoin'), findsOneWidget);
+
+    // On retire le favori depuis la watchlist elle-même
+    await tester.tap(find.byKey(const Key('favorite-toggle-bitcoin')));
     await tester.pump();
 
-    expect(find.text('Ethereum'), findsOneWidget);
-    expect(find.text('Bitcoin'), findsNothing);
-  });
-
-  testWidgets('affiche un état vide si aucune crypto ne correspond', (
-    tester,
-  ) async {
-    await pumpMarket(tester);
-
-    await tester.enterText(
-      find.byKey(const Key('market-search-field')),
-      'solana',
-    );
-    await tester.pump();
-
-    expect(find.text('Aucune crypto trouvée'), findsOneWidget);
-    expect(find.byKey(const Key('market-search-field')), findsOneWidget);
+    expect(find.textContaining("Touche l'étoile"), findsOneWidget);
   });
 }

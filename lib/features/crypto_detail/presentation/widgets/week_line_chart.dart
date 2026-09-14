@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:cryptowatch/app/theme/app_colors.dart';
 
-/// Courbe 7 jours du mockup : ligne orange en dents de scie, point final.
+/// Courbe 7 jours : ligne orange, point final. [values] = prix réels T-10a.
 class WeekLineChart extends StatelessWidget {
   const WeekLineChart({super.key, required this.values});
 

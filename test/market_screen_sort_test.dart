@@ -17,17 +17,17 @@ void main() {
 
   final sampleCryptos = [
     Crypto(
-      id: 'bitcoin',
-      name: 'Bitcoin',
-      symbol: 'btc',
-      currentPrice: 45000.0,
-      lastUpdated: DateTime(2026, 1, 1),
-    ),
-    Crypto(
       id: 'ethereum',
       name: 'Ethereum',
       symbol: 'eth',
       currentPrice: 3000.0,
+      lastUpdated: DateTime(2026, 1, 1),
+    ),
+    Crypto(
+      id: 'bitcoin',
+      name: 'Bitcoin',
+      symbol: 'btc',
+      currentPrice: 45000.0,
       lastUpdated: DateTime(2026, 1, 1),
     ),
   ];
@@ -53,54 +53,37 @@ void main() {
     ).thenAnswer((_) async => sampleCryptos);
   });
 
-  testWidgets('affiche le champ de recherche une fois le marché chargé', (
+  testWidgets('affiche les critères de tri une fois le marché chargé', (
     tester,
   ) async {
     await pumpMarket(tester);
 
-    expect(find.byKey(const Key('market-search-field')), findsOneWidget);
-    expect(find.text('Bitcoin'), findsOneWidget);
-    expect(find.text('Ethereum'), findsOneWidget);
+    expect(find.byKey(const Key('market-sort-price')), findsOneWidget);
+    expect(find.byKey(const Key('market-sort-variation')), findsOneWidget);
+    expect(find.byKey(const Key('market-sort-market-cap')), findsOneWidget);
   });
 
-  testWidgets('filtre la liste par nom', (tester) async {
+  testWidgets('trie par prix du plus élevé au plus bas', (tester) async {
     await pumpMarket(tester);
 
-    await tester.enterText(
-      find.byKey(const Key('market-search-field')),
-      'bit',
-    );
+    await tester.tap(find.byKey(const Key('market-sort-price')));
     await tester.pump();
 
-    expect(find.text('Bitcoin'), findsOneWidget);
-    expect(find.text('Ethereum'), findsNothing);
+    final bitcoin = tester.getTopLeft(find.text('Bitcoin'));
+    final ethereum = tester.getTopLeft(find.text('Ethereum'));
+    expect(bitcoin.dy, lessThan(ethereum.dy));
   });
 
-  testWidgets('filtre la liste par symbole', (tester) async {
+  testWidgets('un second tap inverse le tri par prix', (tester) async {
     await pumpMarket(tester);
 
-    await tester.enterText(
-      find.byKey(const Key('market-search-field')),
-      'ETH',
-    );
+    await tester.tap(find.byKey(const Key('market-sort-price')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('market-sort-price')));
     await tester.pump();
 
-    expect(find.text('Ethereum'), findsOneWidget);
-    expect(find.text('Bitcoin'), findsNothing);
-  });
-
-  testWidgets('affiche un état vide si aucune crypto ne correspond', (
-    tester,
-  ) async {
-    await pumpMarket(tester);
-
-    await tester.enterText(
-      find.byKey(const Key('market-search-field')),
-      'solana',
-    );
-    await tester.pump();
-
-    expect(find.text('Aucune crypto trouvée'), findsOneWidget);
-    expect(find.byKey(const Key('market-search-field')), findsOneWidget);
+    final bitcoin = tester.getTopLeft(find.text('Bitcoin'));
+    final ethereum = tester.getTopLeft(find.text('Ethereum'));
+    expect(ethereum.dy, lessThan(bitcoin.dy));
   });
 }
