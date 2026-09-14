@@ -26,14 +26,18 @@ class WatchlistScreen extends ConsumerWidget {
             )
           : ListView.builder(
               itemCount: watchlist.length,
-              itemBuilder: (context, index) => CryptoCard(
-                crypto: watchlist[index],
-                onTap: () => context.pushNamed(
-                  RouteNames.cryptoDetail,
-                  pathParameters: {'id': watchlist[index].id},
-                  extra: watchlist[index],
-                ),
-              ),
+              itemBuilder: (context, index) {
+                final Crypto crypto = watchlist[index];
+                return CryptoCard(
+                  key: Key('watchlist-card-${crypto.id}'),
+                  symbol: crypto.symbol,
+                  onTap: () => context.pushNamed(
+                    RouteNames.cryptoDetail,
+                    pathParameters: <String, String>{'id': crypto.id},
+                    extra: crypto,
+                  ),
+                );
+              },
             ),
     );
   }
