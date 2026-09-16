@@ -20,17 +20,7 @@ class WatchlistScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Ma watchlist'),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.tune_rounded, color: AppColors.textPrimary),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Ma watchlist'), centerTitle: false),
       body: watchlist.isEmpty
           ? Center(
               child: Padding(
@@ -109,4 +99,3 @@ class WatchlistScreen extends ConsumerWidget {
     );
   }
 }
-

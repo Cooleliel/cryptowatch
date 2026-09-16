@@ -1,3 +1,4 @@
+import 'package:cryptowatch/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,15 +20,14 @@ Crypto _makeCrypto({
   String symbol = 'btc',
   required double price,
   double? variation,
-}) =>
-    Crypto(
-      id: id,
-      name: name,
-      symbol: symbol,
-      currentPrice: price,
-      priceChangePercentage24h: variation,
-      lastUpdated: DateTime(2026, 1, 1),
-    );
+}) => Crypto(
+  id: id,
+  name: name,
+  symbol: symbol,
+  currentPrice: price,
+  priceChangePercentage24h: variation,
+  lastUpdated: DateTime(2026, 1, 1),
+);
 
 /// Notifier factice : renvoie une liste fixe sans faire de requête réseau.
 ///
@@ -50,9 +50,7 @@ Widget _buildCard(String symbol, List<Crypto> cryptos) {
       marketProvider.overrideWith(() => _FakeMarketNotifier(cryptos)),
     ],
     child: MaterialApp(
-      home: Scaffold(
-        body: CryptoCard(symbol: symbol),
-      ),
+      home: Scaffold(body: CryptoCard(symbol: symbol)),
     ),
   );
 }
@@ -111,8 +109,12 @@ void main() {
 
     test('deux ticks dans la fenêtre → le flash repart proprement', () async {
       container.read(cryptoFlashProvider('btc').notifier).trigger(50000);
-      container.read(cryptoFlashProvider('btc').notifier).trigger(51000); // timer T1
-      container.read(cryptoFlashProvider('btc').notifier).trigger(52000); // T1 annulé, T2
+      container
+          .read(cryptoFlashProvider('btc').notifier)
+          .trigger(51000); // timer T1
+      container
+          .read(cryptoFlashProvider('btc').notifier)
+          .trigger(52000); // T1 annulé, T2
 
       expect(container.read(cryptoFlashProvider('btc')), FlashState.up);
 
@@ -136,7 +138,9 @@ void main() {
   // ---------------------------------------------------------------------------
 
   group('CryptoCard —', () {
-    testWidgets('affiche le nom, le symbole et le prix formaté', (tester) async {
+    testWidgets('affiche le nom, le symbole et le prix formaté', (
+      tester,
+    ) async {
       final crypto = _makeCrypto(price: 45230.5);
       await tester.pumpWidget(_buildCard('btc', [crypto]));
       await tester.pump();
@@ -146,33 +150,43 @@ void main() {
       expect(find.text('\$45230.50'), findsOneWidget);
     });
 
-    testWidgets('affiche une flèche verte pour une variation positive',
-        (tester) async {
+    testWidgets('affiche une flèche verte pour une variation positive', (
+      tester,
+    ) async {
       final crypto = _makeCrypto(price: 45000, variation: 2.4);
       await tester.pumpWidget(_buildCard('btc', [crypto]));
       await tester.pump();
 
       final icon = tester.widget<Icon>(find.byIcon(Icons.arrow_drop_up));
-      expect(icon.color, Colors.green);
+      expect(icon.color, AppColors.gain);
       expect(find.text('2.4 %'), findsOneWidget);
     });
 
-    testWidgets('affiche une flèche rouge pour une variation négative',
-        (tester) async {
+    testWidgets('affiche une flèche rouge pour une variation négative', (
+      tester,
+    ) async {
       final crypto = _makeCrypto(
-        id: 'bnb', name: 'BNB', symbol: 'bnb', price: 892, variation: -1.8,
+        id: 'bnb',
+        name: 'BNB',
+        symbol: 'bnb',
+        price: 892,
+        variation: -1.8,
       );
       await tester.pumpWidget(_buildCard('bnb', [crypto]));
       await tester.pump();
 
       final icon = tester.widget<Icon>(find.byIcon(Icons.arrow_drop_down));
-      expect(icon.color, Colors.red);
+      expect(icon.color, AppColors.loss);
       expect(find.text('1.8 %'), findsOneWidget);
     });
 
     testWidgets("n'affiche aucune icône si variation est null", (tester) async {
-      final crypto =
-          _makeCrypto(price: 1.0, symbol: 'usdt', name: 'Tether', id: 'tether');
+      final crypto = _makeCrypto(
+        price: 1.0,
+        symbol: 'usdt',
+        name: 'Tether',
+        id: 'tether',
+      );
       await tester.pumpWidget(_buildCard('usdt', [crypto]));
       await tester.pump();
 
@@ -181,8 +195,12 @@ void main() {
     });
 
     testWidgets('affiche "?" comme initiale si symbole vide', (tester) async {
-      final crypto =
-          _makeCrypto(id: 'unknown', name: 'Unknown', symbol: '', price: 1);
+      final crypto = _makeCrypto(
+        id: 'unknown',
+        name: 'Unknown',
+        symbol: '',
+        price: 1,
+      );
       await tester.pumpWidget(_buildCard('', [crypto]));
       await tester.pump();
 
@@ -190,35 +208,36 @@ void main() {
     });
 
     testWidgets(
-        'pas de flash au premier chargement (cryptoFlashProvider reste none)',
-        (tester) async {
-      // Le premier tick mémorise le prix initial sans déclencher de flash.
-      // On vérifie cryptoFlashProvider directement via le container Riverpod.
-      late ProviderContainer capturedContainer;
-      final crypto = _makeCrypto(price: 50000);
+      'pas de flash au premier chargement (cryptoFlashProvider reste none)',
+      (tester) async {
+        // Le premier tick mémorise le prix initial sans déclencher de flash.
+        // On vérifie cryptoFlashProvider directement via le container Riverpod.
+        late ProviderContainer capturedContainer;
+        final crypto = _makeCrypto(price: 50000);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            ...fakeRealtimeOverrides(),
-            marketProvider.overrideWith(() => _FakeMarketNotifier([crypto])),
-          ],
-          child: Consumer(
-            builder: (context, ref, _) {
-              capturedContainer = ProviderScope.containerOf(context);
-              return MaterialApp(
-                home: Scaffold(body: CryptoCard(symbol: 'btc')),
-              );
-            },
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              ...fakeRealtimeOverrides(),
+              marketProvider.overrideWith(() => _FakeMarketNotifier([crypto])),
+            ],
+            child: Consumer(
+              builder: (context, ref, _) {
+                capturedContainer = ProviderScope.containerOf(context);
+                return MaterialApp(
+                  home: Scaffold(body: CryptoCard(symbol: 'btc')),
+                );
+              },
+            ),
           ),
-        ),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      expect(
-        capturedContainer.read(cryptoFlashProvider('btc')),
-        FlashState.none,
-      );
-    });
+        expect(
+          capturedContainer.read(cryptoFlashProvider('btc')),
+          FlashState.none,
+        );
+      },
+    );
   });
 }

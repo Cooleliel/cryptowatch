@@ -1,4 +1,5 @@
 import 'package:cryptowatch/app/widgets/app_shell.dart';
+import 'package:cryptowatch/features/alerts/presentation/screens/alerts_screen.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/screens/crypto_detail_screen.dart';
 import 'package:cryptowatch/features/market/domain/crypto.dart';
 import 'package:cryptowatch/features/market/presentation/screens/market_screen.dart';
@@ -11,6 +12,7 @@ abstract class RouteNames {
   static const String market = 'marche';
   static const String watchlist = 'watchlist';
   static const String cryptoDetail = 'crypto-detail';
+  static const String alerts = 'alerts';
 }
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
@@ -67,6 +69,14 @@ final Provider<GoRouter> appRouterProvider = Provider<GoRouter>((Ref ref) {
             coinId: id,
             crypto: extra is Crypto ? extra : null,
           );
+        },
+      ),
+      GoRoute(
+        path: '/alerts',
+        name: RouteNames.alerts,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (BuildContext context, GoRouterState state) {
+          return const AlertsScreen();
         },
       ),
     ],
