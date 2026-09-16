@@ -57,7 +57,7 @@ class CryptoCard extends ConsumerWidget {
     final isPositive = (variation ?? 0) >= 0;
     final variationColor = variation == null
         ? AppColors.textSecondary
-        : (isPositive ? Colors.green : Colors.red);
+        : (isPositive ? AppColors.gain : AppColors.loss);
 
     final bool isFavorite = ref.watch(
       favoritesProvider.select((Set<String> ids) => ids.contains(crypto.id)),
@@ -94,7 +94,10 @@ class CryptoCard extends ConsumerWidget {
             child: InkWell(
               onTap: onTap,
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 16,
+                ),
                 child: Row(
                   children: [
                     Container(
@@ -174,9 +177,14 @@ class CryptoCard extends ConsumerWidget {
                         const SizedBox(height: 4),
                         if (variation != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: isPositive ? AppColors.gainPill : AppColors.lossPill,
+                              color: isPositive
+                                  ? AppColors.gainPill
+                                  : AppColors.lossPill,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Row(
@@ -212,7 +220,9 @@ class CryptoCard extends ConsumerWidget {
                           .toggleFavorite(crypto.id),
                       icon: Icon(
                         isFavorite ? Icons.star : Icons.star_border,
-                        color: isFavorite ? AppColors.star : AppColors.textTertiary,
+                        color: isFavorite
+                            ? AppColors.star
+                            : AppColors.textTertiary,
                         size: 24,
                       ),
                     ),
@@ -234,4 +244,3 @@ final _sentinel = Crypto(
   currentPrice: 0,
   lastUpdated: DateTime(0),
 );
-

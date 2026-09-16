@@ -25,8 +25,12 @@ class MarketScreen extends ConsumerWidget {
         centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded, color: AppColors.textPrimary),
-            onPressed: () {},
+            key: const Key('open-alerts-button'),
+            icon: const Icon(
+              Icons.notifications_none_rounded,
+              color: AppColors.textPrimary,
+            ),
+            onPressed: () => context.pushNamed(RouteNames.alerts),
           ),
           const SizedBox(width: 8),
         ],
@@ -91,10 +95,17 @@ class _LoadedMarketView extends ConsumerWidget {
               ),
               decoration: const InputDecoration(
                 hintText: 'Rechercher un nom ou un symbole',
-                prefixIcon: Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 22),
+                prefixIcon: Icon(
+                  Icons.search_rounded,
+                  color: AppColors.textSecondary,
+                  size: 22,
+                ),
                 filled: true,
                 fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
@@ -110,7 +121,11 @@ class _LoadedMarketView extends ConsumerWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.search_off_rounded, size: 48, color: AppColors.textSecondary.withAlpha(120)),
+                      Icon(
+                        Icons.search_off_rounded,
+                        size: 48,
+                        color: AppColors.textSecondary.withAlpha(120),
+                      ),
                       const SizedBox(height: 12),
                       const Text(
                         'Aucune crypto trouvée',
@@ -223,9 +238,7 @@ class _SortChip extends ConsumerWidget {
           if (selected) ...[
             const SizedBox(width: 4),
             Icon(
-              filter.sortDescending
-                  ? Icons.arrow_downward
-                  : Icons.arrow_upward,
+              filter.sortDescending ? Icons.arrow_downward : Icons.arrow_upward,
               size: 14,
               color: Colors.white,
             ),

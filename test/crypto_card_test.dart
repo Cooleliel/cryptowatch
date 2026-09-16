@@ -1,3 +1,4 @@
+import 'package:cryptowatch/app/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -75,7 +76,7 @@ void main() {
     await tester.pump();
 
     final icon = tester.widget<Icon>(find.byIcon(Icons.arrow_drop_up));
-    expect(icon.color, Colors.green);
+    expect(icon.color, AppColors.gain);
     expect(find.text('2.4 %'), findsOneWidget);
   });
 
@@ -95,7 +96,7 @@ void main() {
     await tester.pump();
 
     final icon = tester.widget<Icon>(find.byIcon(Icons.arrow_drop_down));
-    expect(icon.color, Colors.red);
+    expect(icon.color, AppColors.loss);
     expect(find.text('1.8 %'), findsOneWidget);
   });
 
