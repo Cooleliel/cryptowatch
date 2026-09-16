@@ -7,10 +7,8 @@ import 'package:cryptowatch/features/crypto_detail/presentation/providers/price_
 import 'package:cryptowatch/features/crypto_detail/presentation/providers/price_history_state.dart';
 import 'package:cryptowatch/features/crypto_detail/presentation/widgets/week_line_chart.dart';
 import 'package:cryptowatch/features/market/domain/crypto.dart';
-
-/// Fiche crypto. La courbe 7 jours vient de T-10a.
-/// Nom, prix et stats viennent du [Crypto] passé par la liste (T-04b).
-/// Sans [crypto], le mockup Bitcoin est conservé (tests T-04 / T-10b).
+import 'package:cryptowatch/features/watchlist/presentation/providers/favorites_provider.dart';
+/// Fiche crypto moderne selon le design épuré adapté aux fonctionnalités réelles.
 class CryptoDetailScreen extends ConsumerWidget {
   const CryptoDetailScreen({super.key, this.coinId = 'bitcoin', this.crypto});
 
@@ -23,47 +21,248 @@ class CryptoDetailScreen extends ConsumerWidget {
     final selected = crypto;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: SystemUiOverlayStyle.dark,
       child: Scaffold(
         backgroundColor: AppColors.background,
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _DetailHeader(crypto: selected),
-                const SizedBox(height: 28),
-                Text(
-                  selected == null
-                      ? r'$112 840,52'
-                      : formatDetailPrice(selected.currentPrice),
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 40,
-                    fontWeight: FontWeight.w700,
-                    height: 1.1,
-                    letterSpacing: -0.6,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: _DetailHeader(
+                  crypto: selected,
+                  coinId: coinId,
+                ),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Section Prix et Variation
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selected == null
+                                      ? r'$112 840,52'
+                                      : formatDetailPrice(selected.currentPrice),
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 34,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.8,
+                                    height: 1.1,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                _ChangePill(
+                                  change: selected?.priceChangePercentage24h,
+                                  useMockup: selected == null,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Carte du Graphique 7 jours (données réelles CoinGecko)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: AppColors.cardBorder, width: 1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(8),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Historique (7 derniers jours)',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryLight,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    '7D',
+                                    style: TextStyle(
+                                      color: AppColors.primary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _ChartSection(
+                              state: chartState,
+                              onRetry: () => ref
+                                  .read(priceHistoryProvider(coinId).notifier)
+                                  .retry(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Grille de statistiques
+                      const Text(
+                        'Statistiques du marché',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _StatsGrid(crypto: selected),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                _ChangePill(
-                  change: selected?.priceChangePercentage24h,
-                  useMockup: selected == null,
-                ),
-                const SizedBox(height: 28),
-                _ChartSection(
-                  state: chartState,
-                  onRetry: () =>
-                      ref.read(priceHistoryProvider(coinId).notifier).retry(),
-                ),
-                const SizedBox(height: 28),
-                _StatsGrid(crypto: selected),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DetailHeader extends ConsumerWidget {
+  const _DetailHeader({this.crypto, required this.coinId});
+
+  final Crypto? crypto;
+  final String coinId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = crypto;
+    final name = selected?.name ?? 'Bitcoin';
+    final symbol = selected?.symbol ?? 'btc';
+    final letter = selected == null
+        ? 'B'
+        : (selected.symbol.isNotEmpty
+            ? selected.symbol[0].toUpperCase()
+            : '?');
+    final markColor = selected == null
+        ? AppColors.bitcoin
+        : _markColorFor(selected.symbol);
+    final rank = selected == null ? 1 : selected.marketCapRank;
+    final effectiveId = selected?.id ?? coinId;
+
+    final isFavorite = ref.watch(
+      favoritesProvider.select((Set<String> ids) => ids.contains(effectiveId)),
+    );
+
+    return Row(
+      children: [
+        InkWell(
+          onTap: () {
+            final navigator = Navigator.maybeOf(context);
+            if (navigator != null && navigator.canPop()) {
+              navigator.pop();
+            }
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.cardBorder),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(5),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.chevron_left,
+              color: AppColors.textPrimary,
+              size: 28,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Row(
+            children: [
+              _CoinMark(letter: letter, color: markColor),
+              const SizedBox(width: 10),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      name,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      '${symbol.toUpperCase()} / USD',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (rank != null) ...[
+                const SizedBox(width: 8),
+                _RankBadge(label: 'Rang $rank'),
+              ],
+            ],
+          ),
+        ),
+        IconButton(
+          key: Key('favorite-toggle-detail-$effectiveId'),
+          onPressed: () => ref
+              .read(favoritesProvider.notifier)
+              .toggleFavorite(effectiveId),
+          icon: Icon(
+            isFavorite ? Icons.star : Icons.star_border,
+            color: isFavorite ? AppColors.star : AppColors.textSecondary,
+            size: 26,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -79,7 +278,9 @@ class _ChartSection extends StatelessWidget {
     return switch (state) {
       PriceHistoryLoading() => const SizedBox(
           height: 196,
-          child: Center(child: CircularProgressIndicator()),
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.primary),
+          ),
         ),
       PriceHistoryError(:final message) => SizedBox(
           height: 196,
@@ -87,10 +288,12 @@ class _ChartSection extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                const Icon(Icons.error_outline_rounded, color: AppColors.loss, size: 36),
+                const SizedBox(height: 8),
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: AppColors.textSecondary),
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton(
@@ -101,80 +304,8 @@ class _ChartSection extends StatelessWidget {
             ),
           ),
         ),
-      PriceHistoryLoaded(:final prices) => WeekLineChart(values: prices),
+      PriceHistoryLoaded(:final points) => WeekLineChart(points: points),
     };
-  }
-}
-
-class _DetailHeader extends StatelessWidget {
-  const _DetailHeader({this.crypto});
-
-  final Crypto? crypto;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = crypto;
-    final name = selected?.name ?? 'Bitcoin';
-    final letter = selected == null
-        ? 'B'
-        : (selected.symbol.isNotEmpty
-            ? selected.symbol[0].toUpperCase()
-            : '?');
-    final markColor = selected == null
-        ? AppColors.bitcoin
-        : _markColorFor(selected.symbol);
-    final rank = selected == null
-        ? 1
-        : selected.marketCapRank;
-
-    return SizedBox(
-      height: 48,
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () {
-              final navigator = Navigator.maybeOf(context);
-              if (navigator != null && navigator.canPop()) {
-                navigator.pop();
-              }
-            },
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-            icon: const Icon(
-              Icons.chevron_left,
-              color: AppColors.textPrimary,
-              size: 32,
-            ),
-          ),
-          Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _CoinMark(letter: letter, color: markColor),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    name,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                if (rank != null) ...[
-                  const SizedBox(width: 8),
-                  _RankBadge(label: 'Rang $rank'),
-                ],
-              ],
-            ),
-          ),
-          const Icon(Icons.star, color: AppColors.bitcoin, size: 22),
-          const SizedBox(width: 8),
-        ],
-      ),
-    );
   }
 }
 
@@ -187,19 +318,20 @@ class _CoinMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 28,
-      height: 28,
+      width: 32,
+      height: 32,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: color,
+        color: color.withAlpha(30),
         shape: BoxShape.circle,
+        border: Border.all(color: color, width: 1.5),
       ),
       child: Text(
         letter,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 15,
-          fontWeight: FontWeight.w800,
+        style: TextStyle(
+          color: color,
+          fontSize: 16,
+          fontWeight: FontWeight.w900,
           height: 1,
         ),
       ),
@@ -218,14 +350,14 @@ class _RankBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: AppColors.rankBadge,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         label,
         style: const TextStyle(
           color: AppColors.textSecondary,
           fontSize: 11,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
@@ -237,9 +369,6 @@ class _ChangePill extends StatelessWidget {
 
   final double? change;
   final bool useMockup;
-
-  static const _loss = Color(0xFFE85D75);
-  static const _lossPill = Color(0xFF2A1620);
 
   @override
   Widget build(BuildContext context) {
@@ -254,25 +383,25 @@ class _ChangePill extends StatelessWidget {
         : formatDetailChange(value);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isPositive ? AppColors.gainPill : _lossPill,
-        borderRadius: BorderRadius.circular(999),
+        color: isPositive ? AppColors.gainPill : AppColors.lossPill,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             isPositive ? Icons.arrow_drop_up : Icons.arrow_drop_down,
-            color: isPositive ? AppColors.gain : _loss,
-            size: 20,
+            color: isPositive ? AppColors.gain : AppColors.loss,
+            size: 18,
           ),
           Text(
             label,
             style: TextStyle(
-              color: isPositive ? AppColors.gain : _loss,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
+              color: isPositive ? AppColors.gain : AppColors.loss,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
@@ -308,50 +437,65 @@ class _StatsGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      childAspectRatio: 1.55,
+      childAspectRatio: 1.6,
       children: [
-        _StatCard(label: 'Plus haut 24 h', value: high),
-        _StatCard(label: 'Plus bas 24 h', value: low),
-        _StatCard(label: 'Volume 24 h', value: volume),
-        _StatCard(label: 'Capitalisation', value: cap),
+        _StatCard(label: 'Plus haut 24 h', value: high, icon: Icons.trending_up_rounded),
+        _StatCard(label: 'Plus bas 24 h', value: low, icon: Icons.trending_down_rounded),
+        _StatCard(label: 'Volume 24 h', value: volume, icon: Icons.bar_chart_rounded),
+        _StatCard(label: 'Capitalisation', value: cap, icon: Icons.pie_chart_outline_rounded),
       ],
     );
   }
 }
 
 class _StatCard extends StatelessWidget {
-  const _StatCard({required this.label, required this.value});
+  const _StatCard({required this.label, required this.value, required this.icon});
 
   final String label;
   final String value;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(5),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              Icon(icon, size: 16, color: AppColors.textTertiary),
+            ],
           ),
-          const SizedBox(height: 18),
           Text(
             value,
             style: const TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
               letterSpacing: -0.3,
             ),
           ),
@@ -419,3 +563,5 @@ String _groupThousands(String digits) {
   }
   return buffer.toString();
 }
+
+
